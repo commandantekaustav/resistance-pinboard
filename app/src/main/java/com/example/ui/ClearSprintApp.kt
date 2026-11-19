@@ -174,6 +174,7 @@ private fun AuthenticatedWorkspace(
     val capabilities by viewModel.capabilities.collectAsStateWithLifecycle()
     val tasksState by viewModel.tasksState.collectAsStateWithLifecycle()
     val filesState by viewModel.filesState.collectAsStateWithLifecycle()
+    val sprintForecast by viewModel.sprintForecast.collectAsStateWithLifecycle()
     val githubData by viewModel.githubData.collectAsStateWithLifecycle()
     val localSettings by viewModel.localSettings.collectAsStateWithLifecycle()
     val timerState by viewModel.timerState.collectAsStateWithLifecycle()
@@ -322,6 +323,7 @@ private fun AuthenticatedWorkspace(
                             AppDestination.FOCUS -> FocusDashboardScreen(
                                 project = activeProject,
                                 tasks = tasks,
+                                forecast = sprintForecast,
                                 capabilities = capabilities,
                                 calmModeEnabled = localSettings.calmModeEnabled,
                                 timerState = timerState,

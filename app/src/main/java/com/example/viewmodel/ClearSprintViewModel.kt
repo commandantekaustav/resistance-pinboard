@@ -21,6 +21,8 @@ import com.example.data.model.TaskStatus
 import com.example.data.model.ThemeMode
 import com.example.data.model.UiState
 import com.example.data.model.WidgetConfig
+import com.example.domain.SprintForecast
+import com.example.domain.SprintForecastEngine
 import com.example.notifications.MilestoneNotifier
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
@@ -156,6 +158,19 @@ class ClearSprintViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), UiState.Loading)
+
+    val sprintForecast: StateFlow<SprintForecast> = combine(
+        activeProject,
+        tasksState,
+        localSettings
+    ) { project, tState, prefs ->
+        val tasks = (tState as? UiState.Success)?.data.orEmpty()
+        SprintForecastEngine.compute(
+            project = project,
+            tasks = tasks,
+            focusBlockMinutes = prefs.focusDurationMinutes
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), SprintForecast())
 
     private val _githubData = MutableStateFlow(GitHubWorkspaceData())
     val githubData: StateFlow<GitHubWorkspaceData> = _githubData.asStateFlow()

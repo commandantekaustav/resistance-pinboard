@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.Project
 import com.example.data.model.SprintTask
 import com.example.data.model.TaskStatus
+import com.example.domain.SprintForecast
+import com.example.ui.components.SprintForecastCard
 import com.example.ui.theme.MonoFontFamily
 import com.example.viewmodel.FocusTimerState
 import com.example.viewmodel.RoleCapabilities
@@ -69,6 +71,7 @@ import com.example.viewmodel.RoleCapabilities
 fun FocusDashboardScreen(
     project: Project?,
     tasks: List<SprintTask>,
+    forecast: SprintForecast,
     capabilities: RoleCapabilities,
     calmModeEnabled: Boolean,
     timerState: FocusTimerState,
@@ -162,18 +165,25 @@ fun FocusDashboardScreen(
                 )
             }
 
-            // 2. Sprint Progress & Deadline Visualization (hidden in Calm Mode to minimize stimulus)
+            // 2. Sprint Progress, Forecast & Delay Estimator (hidden in Calm Mode to minimize stimulus)
             item {
                 AnimatedVisibility(visible = !calmModeEnabled) {
-                    SprintProgressCard(
-                        progress = progressFraction,
-                        doneCount = doneCount,
-                        totalCount = tasks.size,
-                        milestoneDone = milestoneDone,
-                        milestoneTotal = milestoneTotal,
-                        deadlineLabel = formatDeadline(project.sprintDeadlineMs),
-                        roleLabel = capabilities.role.label
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        SprintProgressCard(
+                            progress = progressFraction,
+                            doneCount = doneCount,
+                            totalCount = tasks.size,
+                            milestoneDone = milestoneDone,
+                            milestoneTotal = milestoneTotal,
+                            deadlineLabel = formatDeadline(project.sprintDeadlineMs),
+                            roleLabel = capabilities.role.label
+                        )
+                        SprintForecastCard(
+                            forecast = forecast,
+                            canEdit = capabilities.canEditContent,
+                            onPinFocusTask = onPinFocusTask
+                        )
+                    }
                 }
             }
 
