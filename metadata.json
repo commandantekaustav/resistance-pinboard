@@ -1,0 +1,6 @@
+{
+  "name": "ClearSprint",
+  "description": "Minimalist, ADHD-friendly team project and sprint manager for Google Buildathon with real-time Firebase sync, offline support, GitHub repository tracking, RBAC, focus reminders, and home screen widgets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
