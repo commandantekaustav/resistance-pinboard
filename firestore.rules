@@ -1,0 +1,314 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidInviteCode(code) {
+      return code is string && code.size() >= 6 && code.size() <= 12 && code.matches('^[A-Z0-9]+$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isValidStringList(arr, maxLen, maxItemLen) {
+      return arr is list &&
+             arr.size() <= maxLen &&
+             (arr.size() == 0 || (arr[0] is string && arr[0].size() <= maxItemLen));
+    }
+
+    function isProjectRole(projectId, allowedRoles) {
+      return exists(/databases/$(database)/documents/projects/$(projectId)) &&
+             (request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.roles) &&
+             (get(/databases/$(database)/documents/projects/$(projectId)).data.roles[request.auth.uid] in allowedRoles);
+    }
+
+    // --- Entity Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 120)) &&
+             data.focusMinutes is int && data.focusMinutes >= 5 && data.focusMinutes <= 90 &&
+             data.reminderIntervalMinutes is int && data.reminderIntervalMinutes >= 0 && data.reminderIntervalMinutes <= 240 &&
+             data.calmModeEnabled is bool;
+    }
+
+    function isValidProjectInvite(data) {
+      return isValidId(data.projectId) &&
+             data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.projectName is string && data.projectName.size() >= 1 && data.projectName.size() <= 80;
+    }
+
+    function isValidProject(data) {
+      return data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.description is string && data.description.size() <= 400 &&
+             data.sprintName is string && data.sprintName.size() >= 1 && data.sprintName.size() <= 60 &&
+             data.sprintDeadlineMs is int && data.sprintDeadlineMs >= 0 &&
+             data.githubOwner is string && data.githubOwner.size() <= 80 &&
+             data.githubRepo is string && data.githubRepo.size() <= 100 &&
+             isValidInviteCode(data.inviteCode) &&
+             data.webhookUrl is string && data.webhookUrl.size() <= 300 &&
+             data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 25 &&
+             data.memberUids[0] is string && data.memberUids[0].size() <= 128 &&
+             data.roles is map && data.roles.size() >= 1 && data.roles.size() <= 25 &&
+             data.memberNames is map && data.memberNames.size() >= 1 && data.memberNames.size() <= 25 &&
+             isValidStringList(data.milestoneEmails, 10, 120);
+    }
+
+    function isValidTask(data, projectId) {
+      return data.projectId == projectId &&
+             data.creatorId is string && data.creatorId.size() >= 1 && data.creatorId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.status in ['TODO', 'IN_PROGRESS', 'DONE'] &&
+             data.priority in ['LOW', 'MEDIUM', 'HIGH'] &&
+             data.assigneeUid is string && data.assigneeUid.size() <= 128 &&
+             data.assigneeName is string && data.assigneeName.size() <= 60 &&
+             data.dueDateMs is int && data.dueDateMs >= 0 &&
+             data.estimateMinutes is int && data.estimateMinutes >= 5 && data.estimateMinutes <= 480 &&
+             data.milestone is bool &&
+             data.focused is bool &&
+             isValidStringList(data.substeps, 10, 140) &&
+             isValidStringList(data.completedSubsteps, 10, 140) &&
+             data.githubIssueNumber is int && data.githubIssueNumber >= 0 &&
+             data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 25 &&
+             data.memberUids[0] is string && data.memberUids[0].size() <= 128;
+    }
+
+    function isValidProjectFile(data, projectId) {
+      return data.projectId == projectId &&
+             data.creatorId is string && data.creatorId.size() >= 1 && data.creatorId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+             data.path is string && data.path.size() >= 1 && data.path.size() <= 240 &&
+             data.fileType in ['CODE', 'DOC', 'DESIGN', 'SPEC', 'LINK'] &&
+             data.url is string && data.url.size() <= 300 &&
+             data.notes is string && data.notes.size() <= 600 &&
+             isValidStringList(data.tags, 8, 40) &&
+             data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 25 &&
+             data.memberUids[0] is string && data.memberUids[0].size() <= 128;
+    }
+
+    // --- 1. Private User Profile & ADHD Preferences ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'focusMinutes', 'reminderIntervalMinutes', 'calmModeEnabled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'focusMinutes', 'reminderIntervalMinutes', 'calmModeEnabled', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'focusMinutes', 'reminderIntervalMinutes', 'calmModeEnabled', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // --- 2. Invite Code Lookup (Get-Only, Unlistable) ---
+    match /project_invites/{inviteCode} {
+      allow get: if isSignedIn() && isValidInviteCode(inviteCode);
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+                       isValidInviteCode(inviteCode) &&
+                       isValidProjectInvite(incoming()) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().keys().hasAll(['projectId', 'ownerId', 'projectName', 'createdAt']) &&
+                       incoming().keys().hasOnly(['projectId', 'ownerId', 'projectName', 'createdAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       exists(/databases/$(database)/documents/projects/$(incoming().projectId)) &&
+                       get(/databases/$(database)/documents/projects/$(incoming().projectId)).data.ownerId == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidInviteCode(inviteCode) && existing().ownerId == request.auth.uid;
+    }
+
+    // --- 3. Team Projects with Action-Based RBAC ---
+    match /projects/{projectId} {
+      allow get: if isSignedIn() && isValidId(projectId) && request.auth.uid in existing().memberUids;
+      allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+      allow create: if isSignedIn() &&
+                       isValidId(projectId) &&
+                       isValidProject(incoming()) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().memberUids == [request.auth.uid] &&
+                       incoming().roles.keys().hasOnly([request.auth.uid]) &&
+                       incoming().roles[request.auth.uid] == 'OWNER' &&
+                       incoming().memberNames.keys().hasOnly([request.auth.uid]) &&
+                       incoming().keys().hasAll(['ownerId', 'name', 'description', 'sprintName', 'sprintDeadlineMs', 'githubOwner', 'githubRepo', 'inviteCode', 'webhookUrl', 'memberUids', 'roles', 'memberNames', 'milestoneEmails', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'name', 'description', 'sprintName', 'sprintDeadlineMs', 'githubOwner', 'githubRepo', 'inviteCode', 'webhookUrl', 'memberUids', 'roles', 'memberNames', 'milestoneEmails', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isSignedIn() &&
+                       isValidId(projectId) &&
+                       isValidProject(incoming()) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().inviteCode == existing().inviteCode &&
+                       isValidTimestamp(incoming().updatedAt) && (
+                         // Action 1: OWNER or ADMIN updates project settings, sprint deadline, GitHub repo, or milestone emails
+                         (
+                           (request.auth.uid in existing().roles) &&
+                           (existing().roles[request.auth.uid] in ['OWNER', 'ADMIN']) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'sprintName', 'sprintDeadlineMs', 'githubOwner', 'githubRepo', 'webhookUrl', 'milestoneEmails', 'updatedAt'])
+                         ) ||
+                         // Action 2: OWNER or ADMIN manages RBAC member roles (cannot demote or remove OWNER)
+                         (
+                           (request.auth.uid in existing().roles) &&
+                           (existing().roles[request.auth.uid] in ['OWNER', 'ADMIN']) &&
+                           (existing().ownerId in incoming().memberUids) &&
+                           incoming().roles[existing().ownerId] == 'OWNER' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'roles', 'memberNames', 'updatedAt'])
+                         ) ||
+                         // Action 3: Teammate self-joins using a valid inviteCode (strictly EDITOR role, zero privilege escalation)
+                         (
+                           !(request.auth.uid in existing().memberUids) &&
+                           (request.auth.uid in incoming().memberUids) &&
+                           incoming().memberUids.size() == existing().memberUids.size() + 1 &&
+                           incoming().memberUids.hasAll(existing().memberUids) &&
+                           incoming().roles.diff(existing().roles).affectedKeys().hasOnly([request.auth.uid]) &&
+                           incoming().roles[request.auth.uid] == 'EDITOR' &&
+                           incoming().memberNames.diff(existing().memberNames).affectedKeys().hasOnly([request.auth.uid]) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'roles', 'memberNames', 'updatedAt']) &&
+                           exists(/databases/$(database)/documents/project_invites/$(existing().inviteCode))
+                         ) ||
+                         // Action 4: Non-owner teammate leaves project
+                         (
+                           (request.auth.uid in existing().memberUids) &&
+                           request.auth.uid != existing().ownerId &&
+                           !(request.auth.uid in incoming().memberUids) &&
+                           incoming().memberUids.size() == existing().memberUids.size() - 1 &&
+                           existing().memberUids.hasAll(incoming().memberUids) &&
+                           existing().roles.diff(incoming().roles).affectedKeys().hasOnly([request.auth.uid]) &&
+                           existing().memberNames.diff(incoming().memberNames).affectedKeys().hasOnly([request.auth.uid]) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'roles', 'memberNames', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(projectId) && existing().ownerId == request.auth.uid;
+
+      // --- 4. Project Tasks & Milestones ---
+      match /tasks/{taskId} {
+        allow get: if isSignedIn() && isValidId(projectId) && isValidId(taskId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(projectId) &&
+                         isValidId(taskId) &&
+                         isValidTask(incoming(), projectId) &&
+                         incoming().creatorId == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll(['projectId', 'creatorId', 'title', 'description', 'status', 'priority', 'assigneeUid', 'assigneeName', 'dueDateMs', 'estimateMinutes', 'milestone', 'focused', 'substeps', 'completedSubsteps', 'githubIssueNumber', 'memberUids', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['projectId', 'creatorId', 'title', 'description', 'status', 'priority', 'assigneeUid', 'assigneeName', 'dueDateMs', 'estimateMinutes', 'milestone', 'focused', 'substeps', 'completedSubsteps', 'githubIssueNumber', 'memberUids', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isProjectRole(projectId, ['OWNER', 'ADMIN', 'EDITOR']);
+
+        allow update: if isSignedIn() &&
+                         isValidId(projectId) &&
+                         isValidId(taskId) &&
+                         isValidTask(incoming(), projectId) &&
+                         incoming().projectId == existing().projectId &&
+                         incoming().creatorId == existing().creatorId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) && (
+                           // Tier 1: OWNER / ADMIN full task update + membership sync
+                           (
+                             isProjectRole(projectId, ['OWNER', 'ADMIN']) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'status', 'priority', 'assigneeUid', 'assigneeName', 'dueDateMs', 'estimateMinutes', 'milestone', 'focused', 'substeps', 'completedSubsteps', 'githubIssueNumber', 'memberUids', 'updatedAt'])
+                           ) ||
+                           // Tier 2: EDITOR task workflow & focus updates (cannot alter memberUids)
+                           (
+                             isProjectRole(projectId, ['EDITOR']) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'status', 'priority', 'assigneeUid', 'assigneeName', 'dueDateMs', 'estimateMinutes', 'milestone', 'focused', 'substeps', 'completedSubsteps', 'updatedAt'])
+                           )
+                         );
+
+        allow delete: if isSignedIn() &&
+                         isValidId(projectId) &&
+                         isValidId(taskId) && (
+                           isProjectRole(projectId, ['OWNER', 'ADMIN']) ||
+                           (existing().creatorId == request.auth.uid && isProjectRole(projectId, ['EDITOR']))
+                         );
+      }
+
+      // --- 5. Searchable Project Files & Docs ---
+      match /files/{fileId} {
+        allow get: if isSignedIn() && isValidId(projectId) && isValidId(fileId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(projectId) &&
+                         isValidId(fileId) &&
+                         isValidProjectFile(incoming(), projectId) &&
+                         incoming().creatorId == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll(['projectId', 'creatorId', 'name', 'path', 'fileType', 'url', 'notes', 'tags', 'memberUids', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['projectId', 'creatorId', 'name', 'path', 'fileType', 'url', 'notes', 'tags', 'memberUids', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isProjectRole(projectId, ['OWNER', 'ADMIN', 'EDITOR']);
+
+        allow update: if isSignedIn() &&
+                         isValidId(projectId) &&
+                         isValidId(fileId) &&
+                         isValidProjectFile(incoming(), projectId) &&
+                         incoming().projectId == existing().projectId &&
+                         incoming().creatorId == existing().creatorId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) && (
+                           (
+                             isProjectRole(projectId, ['OWNER', 'ADMIN']) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['name', 'path', 'fileType', 'url', 'notes', 'tags', 'memberUids', 'updatedAt'])
+                           ) ||
+                           (
+                             isProjectRole(projectId, ['EDITOR']) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['name', 'path', 'fileType', 'url', 'notes', 'tags', 'updatedAt'])
+                           )
+                         );
+
+        allow delete: if isSignedIn() &&
+                         isValidId(projectId) &&
+                         isValidId(fileId) && (
+                           isProjectRole(projectId, ['OWNER', 'ADMIN']) ||
+                           (existing().creatorId == request.auth.uid && isProjectRole(projectId, ['EDITOR']))
+                         );
+      }
+    }
+  }
+}

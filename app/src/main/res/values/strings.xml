@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">ClearSprint</string>
+    <string name="widget_label">ClearSprint Focus</string>
+    <string name="widget_description">Calm sprint progress and next focus task right on your home screen.</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="auth_tagline">Calm sprint management for focused teams.</string>
+    <string name="auth_subtitle">Real-time Firebase sync, offline access, GitHub tracking, and low-clutter focus tools.</string>
+    <string name="nav_focus">Focus</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_team">Team</string>
+    <string name="offline_banner">Offline mode — viewing cached workspace. Changes sync automatically.</string>
+    <string name="calm_mode_on">Calm Mode</string>
+    <string name="focus_now_label">FOCUS NOW</string>
+    <string name="no_active_project">Create or join your Buildathon project to begin.</string>
+    <string name="viewer_readonly_notice">Viewer role — read-only access</string>
 </resources>

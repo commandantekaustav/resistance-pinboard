@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user preferences, ADHD focus timer defaults, and reminder settings isolated per authenticated user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Authenticated Firebase UID" },
+        "displayName": { "type": "string", "description": "Display name shown to teammates" },
+        "email": { "type": "string", "description": "Private user email visible only to owner" },
+        "focusMinutes": { "type": "integer", "description": "Preferred ADHD focus session duration in minutes (5-90)" },
+        "reminderIntervalMinutes": { "type": "integer", "description": "Gentle check-in reminder interval in minutes (0 = off)" },
+        "calmModeEnabled": { "type": "boolean", "description": "Minimalist low-stimulus focus view toggle" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" }
+      },
+      "required": ["userId", "displayName", "focusMinutes", "reminderIntervalMinutes", "calmModeEnabled", "createdAt", "updatedAt"]
+    },
+    "ProjectInvite": {
+      "title": "ProjectInvite",
+      "description": "Lookup record keyed by 6-12 char invite code enabling teammates to join a project securely without listing projects.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "description": "Target project document ID" },
+        "ownerId": { "type": "string", "description": "Project owner UID" },
+        "projectName": { "type": "string", "description": "Project title preview" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" }
+      },
+      "required": ["projectId", "ownerId", "projectName", "createdAt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Collaborative Buildathon project workspace with sprint tracking, GitHub repository coordinates, RBAC roles, and milestone email recipients.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "Original creator and OWNER UID" },
+        "name": { "type": "string", "description": "Project name" },
+        "description": { "type": "string", "description": "Short calm project goal" },
+        "sprintName": { "type": "string", "description": "Current sprint title" },
+        "sprintDeadlineMs": { "type": "integer", "description": "Sprint deadline epoch milliseconds" },
+        "githubOwner": { "type": "string", "description": "Linked GitHub repository owner or org" },
+        "githubRepo": { "type": "string", "description": "Linked GitHub repository name" },
+        "inviteCode": { "type": "string", "description": "Team invite code (6-12 uppercase alphanumeric)" },
+        "webhookUrl": { "type": "string", "description": "Optional free Google Apps Script email webhook URL" },
+        "memberUids": { "type": "array", "description": "Bounded list of team member UIDs (max 25)" },
+        "roles": { "type": "object", "description": "Map of UID to RBAC role (OWNER, ADMIN, EDITOR, VIEWER)" },
+        "memberNames": { "type": "object", "description": "Map of UID to member display name" },
+        "milestoneEmails": { "type": "array", "description": "Bounded list of team email addresses for milestone updates (max 10)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" }
+      },
+      "required": ["ownerId", "name", "description", "sprintName", "sprintDeadlineMs", "githubOwner", "githubRepo", "inviteCode", "webhookUrl", "memberUids", "roles", "memberNames", "milestoneEmails", "createdAt", "updatedAt"]
+    },
+    "SprintTask": {
+      "title": "SprintTask",
+      "description": "Real-time sprint task or milestone with ADHD-friendly micro-substeps, focus marker, and optional GitHub issue reference.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "description": "Parent project ID" },
+        "creatorId": { "type": "string", "description": "Task author UID" },
+        "title": { "type": "string", "description": "Concise task title" },
+        "description": { "type": "string", "description": "Optional task notes" },
+        "status": { "type": "string", "enum": ["TODO", "IN_PROGRESS", "DONE"], "description": "Workflow state" },
+        "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"], "description": "Priority level" },
+        "assigneeUid": { "type": "string", "description": "Assigned teammate UID or empty" },
+        "assigneeName": { "type": "string", "description": "Assigned teammate display name" },
+        "dueDateMs": { "type": "integer", "description": "Task deadline epoch milliseconds" },
+        "estimateMinutes": { "type": "integer", "description": "ADHD-friendly effort estimate in minutes" },
+        "milestone": { "type": "boolean", "description": "Marks task as a project milestone that triggers email notifications" },
+        "focused": { "type": "boolean", "description": "Pinned as the current Focus Now task" },
+        "substeps": { "type": "array", "description": "Bounded list of micro-steps (max 10)" },
+        "completedSubsteps": { "type": "array", "description": "Bounded list of completed micro-steps (max 10)" },
+        "githubIssueNumber": { "type": "integer", "description": "Linked GitHub issue number (0 if none)" },
+        "memberUids": { "type": "array", "description": "Denormalized project member UIDs for fast scoped list queries" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" }
+      },
+      "required": ["projectId", "creatorId", "title", "description", "status", "priority", "assigneeUid", "assigneeName", "dueDateMs", "estimateMinutes", "milestone", "focused", "substeps", "completedSubsteps", "githubIssueNumber", "memberUids", "createdAt", "updatedAt"]
+    },
+    "ProjectFile": {
+      "title": "ProjectFile",
+      "description": "Searchable project file, spec, design link, or document reference synced across the team.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "description": "Parent project ID" },
+        "creatorId": { "type": "string", "description": "File entry author UID" },
+        "name": { "type": "string", "description": "File or document name" },
+        "path": { "type": "string", "description": "Logical or repository path" },
+        "fileType": { "type": "string", "enum": ["CODE", "DOC", "DESIGN", "SPEC", "LINK"], "description": "Category for quick filtering" },
+        "url": { "type": "string", "description": "Optional external or GitHub URL" },
+        "notes": { "type": "string", "description": "Short searchable summary" },
+        "tags": { "type": "array", "description": "Bounded searchable tags (max 8)" },
+        "memberUids": { "type": "array", "description": "Denormalized project member UIDs for fast scoped list queries" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()" }
+      },
+      "required": ["projectId", "creatorId", "name", "path", "fileType", "url", "notes", "tags", "memberUids", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user settings and ADHD focus preferences"
+    },
+    "/project_invites/{inviteCode}": {
+      "schema": { "$ref": "#/entities/ProjectInvite" },
+      "description": "Invite code to projectId lookup (get-only, never listable)"
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Collaborative Buildathon projects with RBAC roles and GitHub config"
+    },
+    "/projects/{projectId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/SprintTask" },
+      "description": "Project sprint tasks and milestones with denormalized memberUids"
+    },
+    "/projects/{projectId}/files/{fileId}": {
+      "schema": { "$ref": "#/entities/ProjectFile" },
+      "description": "Searchable project files and documents with denormalized memberUids"
+    }
+  }
+}
