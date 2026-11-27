@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "579454920935",
+    "project_id": "resistance-pinboard-4d765",
+    "storage_bucket": "resistance-pinboard-4d765.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:579454920935:android:52ab2bf5565fb7429d1a42",
+        "android_client_info": {
+          "package_name": "com.aistudio.clearsprint.krmvxq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAETRzN2HPAd2gJt8rAPk6xKYRy6fWQScc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
