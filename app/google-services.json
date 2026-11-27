@@ -12,7 +12,20 @@
           "package_name": "com.aistudio.clearsprint.krmvxq"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "579454920935-ijls3hfg1dbm2j28saa1ibj60nggfo7e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.clearsprint.krmvxq",
+            "certificate_hash": "5d4fd1e2cebf4a4c156aee602b7e4c093ff9b9e3"
+          }
+        },
+        {
+          "client_id": "579454920935-cgm2gd9abn6mgo2qj245lv5gs5bhnk5t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAETRzN2HPAd2gJt8rAPk6xKYRy6fWQScc"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "579454920935-cgm2gd9abn6mgo2qj245lv5gs5bhnk5t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
