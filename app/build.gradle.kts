@@ -68,6 +68,7 @@ android {
     includeInApk = false
     includeInBundle = true
   }
+  
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
@@ -137,4 +138,9 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   // "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+    // Import the BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    
+    // Add Firebase Authentication
+    implementation("com.google.firebase:firebase-auth")
 }
